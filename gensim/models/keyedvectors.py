@@ -1230,7 +1230,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         if section:
             # store the last section, too
             sections.append(section)
-            self._log_evaluate_word_analogies(section)
+            self._log_evaluate_analogy_space(section)
 
         total = {
             'section': 'Total accuracy',

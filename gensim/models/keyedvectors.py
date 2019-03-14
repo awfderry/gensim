@@ -1112,6 +1112,143 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         sections.append(total)
         # Return the overall score and the full lists of correct and incorrect analogies
         return analogies_score, sections
+    
+    @staticmethod
+    def _cos_metric(a, b, c, d):
+        """Calculate analogy space evaluation metric based on cosine distance from Che et al. (2017)
+        Parameters
+        ----------
+        a,b,c,d: numpy arrays of length embed_dimension
+            word vectors
+
+        Returns
+        -------
+        float
+            Evaluation score.
+        """
+        norm_ab = np.linalg.norm(b - a)
+        norm_cd = np.linalg.norm(d - c)
+        dotprod = np.dot(b - a, d - c)
+        return dotprod / (norm_ab * norm_cd)
+
+    @staticmethod
+    def _log_evaluate_word_analogies(section):
+        """Calculate score by section, helper for
+        :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.evaluate_analogy_space`.
+        Parameters
+        ----------
+        section : dict of (str, (str, str, str, str))
+            Section given from evaluation.
+        Returns
+        -------
+        float
+            Mean evaluation score for section.
+        """
+        scores = section['scores']
+        score = np.mean(scores)
+        return score
+
+    def evaluate_analogy_space(self, analogies, restrict_vocab=300000, case_insensitive=True, dummy4unknown=False):
+        """Compute performance of the model on an analogy test set.
+        This is an adaptation of the original gensim analogy implementation of keyedvectors.evaluate_word_analogies().
+        Instead of evaluating a single correct answer and returning an accuracy, this method evaluates the similarity of the relation vectors.
+        This does not require a traversal of the vocab and thus speeds up computation.
+        See Che et al. 2017 (https://repeval2017.github.io/papers/RepEval02.pdf) for more details.
+        The score is reported (printed to log and returned as a score) for each section separately,
+        plus there's one aggregate summary at the end.
+
+        Parameters
+        ----------
+        analogies : str
+            Path to file, where lines are 4-tuples of words, split into sections by ": SECTION NAME" lines.
+            See `gensim/test/test_data/questions-words.txt` as example.
+        restrict_vocab : int, optional
+            Ignore all 4-tuples containing a word not in the first `restrict_vocab` words.
+            This may be meaningful if you've sorted the model vocabulary by descending frequency (which is standard
+            in modern word embedding models).
+        case_insensitive : bool, optional
+            If True - convert all words to their uppercase form before evaluating the performance.
+            Useful to handle case-mismatch between training tokens and words in the test set.
+            In case of multiple case variants of a single word, the vector for the first occurrence
+            (also the most frequent if vocabulary is sorted) is taken.
+        dummy4unknown : bool, optional
+            If True - produce zero accuracies for 4-tuples with out-of-vocabulary words.
+            Otherwise, these tuples are skipped entirely and not used in the evaluation.
+        Returns
+        -------
+        score : float
+            The overall evaluation score on the entire evaluation set
+        sections : list of dict of {str : str or list of tuple of (str, str, str, str)}
+            Results broken down by each section of the evaluation set. Each dict contains the name of the section
+            under the key 'section', and lists of correctly and incorrectly predicted 4-tuples of words under the
+            keys 'correct' and 'incorrect'.
+        """
+        ok_vocab = [(w, self.vocab[w]) for w in self.index2word[:restrict_vocab]]
+        ok_vocab = {w.upper(): v for w, v in reversed(ok_vocab)} if case_insensitive else dict(ok_vocab)
+        oov = 0
+        logger.info("Evaluating word analogies for top %i words in the model on %s", restrict_vocab, analogies)
+        sections, section = [], None
+        quadruplets_no = 0
+        for line_no, line in enumerate(utils.smart_open(analogies)):
+            line = utils.to_unicode(line)
+            if line.startswith(': '):
+                # a new section starts => store the old section
+                if section:
+                    sections.append(section)
+                    self._log_evaluate_word_analogies(section)
+                section = {'section': line.lstrip(': ').strip(), 'scores': []}
+            else:
+                if not section:
+                    raise ValueError("Missing section header before line #%i in %s" % (line_no, analogies))
+                try:
+                    if case_insensitive:
+                        a, b, c, expected = [word.upper() for word in line.split()]
+                    else:
+                        a, b, c, expected = [word for word in line.split()]
+                except ValueError:
+                    logger.info("Skipping invalid line #%i in %s", line_no, analogies)
+                    continue
+                quadruplets_no += 1
+                if a not in ok_vocab or b not in ok_vocab or c not in ok_vocab or expected not in ok_vocab:
+                    oov += 1
+                    if dummy4unknown:
+                        logger.debug('Zero accuracy for line #%d with OOV words: %s', line_no, line.strip())
+                        section['incorrect'].append((a, b, c, expected))
+                    else:
+                        logger.debug("Skipping line #%i with OOV words: %s", line_no, line.strip())
+                    continue
+                original_vocab = self.vocab
+                self.vocab = ok_vocab
+
+                ###### Begin new code ######
+                vectors = [self.word_vec(w) for w in (a,b,c,expected)]
+                score = self._cos_metric(*vectors)
+                section['scores'].append(score)
+                ###### End new code ######
+
+
+        if section:
+            # store the last section, too
+            sections.append(section)
+            self._log_evaluate_word_analogies(section)
+
+        total = {
+            'section': 'Total accuracy',
+            'correct': list(chain.from_iterable(s['correct'] for s in sections)),
+            'incorrect': list(chain.from_iterable(s['incorrect'] for s in sections)),
+        }
+
+        oov_ratio = float(oov) / quadruplets_no * 100
+        logger.info('Quadruplets with out-of-vocabulary words: %.1f%%', oov_ratio)
+        if not dummy4unknown:
+            logger.info(
+                'NB: analogies containing OOV words were skipped from evaluation! '
+                'To change this behavior, use "dummy4unknown=True"'
+            )
+        analogies_score = self._log_evaluate_word_analogies(total)
+        sections.append(total)
+        # Return the overall score and the full lists of correct and incorrect analogies
+        return analogies_score, sections
 
     @staticmethod
     def log_accuracy(section):

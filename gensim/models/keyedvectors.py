@@ -1132,7 +1132,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         return dotprod / (norm_ab * norm_cd)
 
     @staticmethod
-    def _log_evaluate_word_analogies(section):
+    def _log_evaluate_analogy_space(section):
         """Calculate score by section, helper for
         :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.evaluate_analogy_space`.
         Parameters
@@ -1195,7 +1195,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
                 # a new section starts => store the old section
                 if section:
                     sections.append(section)
-                    self._log_evaluate_word_analogies(section)
+                    self._log_evaluate_analogy_space(section)
                 section = {'section': line.lstrip(': ').strip(), 'scores': []}
             else:
                 if not section:
@@ -1245,7 +1245,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
                 'NB: analogies containing OOV words were skipped from evaluation! '
                 'To change this behavior, use "dummy4unknown=True"'
             )
-        analogies_score = self._log_evaluate_word_analogies(total)
+        analogies_score = self._log_evaluate_analogy_space(total)
         sections.append(total)
         # Return the overall score and the full lists of correct and incorrect analogies
         return analogies_score, sections

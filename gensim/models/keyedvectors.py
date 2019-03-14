@@ -1234,8 +1234,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
 
         total = {
             'section': 'Total accuracy',
-            'correct': list(chain.from_iterable(s['correct'] for s in sections)),
-            'incorrect': list(chain.from_iterable(s['incorrect'] for s in sections)),
+            'scores': list(chain.from_iterable(s['score'] for s in sections)),
         }
 
         oov_ratio = float(oov) / quadruplets_no * 100

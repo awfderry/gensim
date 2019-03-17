@@ -1129,7 +1129,25 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         norm_ab = np.linalg.norm(b - a)
         norm_cd = np.linalg.norm(d - c)
         dotprod = np.dot(b - a, d - c)
-        return dotprod / (norm_ab * norm_cd)
+        return np.abs(dotprod) / (norm_ab * norm_cd)
+    
+    @staticmethod
+    def _euc_metric(a, b, c, d):
+        """Calculate analogy space evaluation metric based on euclidean distance from Che et al. (2017)
+        Parameters
+        ----------
+        a,b,c,d: numpy arrays of length embed_dimension
+            word vectors
+
+        Returns
+        -------
+        float
+            Evaluation score.
+        """
+        norm_ab = np.linalg.norm(b - a)
+        norm_cd = np.linalg.norm(d - c)
+        num = np.linalg.norm((b-a) - (d-c))
+        return 1 - (num / (norm_ab * norm_cd))
 
     @staticmethod
     def _log_evaluate_analogy_space(section):
@@ -1148,7 +1166,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         score = np.mean(scores)
         return score
 
-    def evaluate_analogy_space(self, analogies, restrict_vocab=300000, case_insensitive=True, dummy4unknown=False):
+    def evaluate_analogy_space(self, analogies, metric='cos', restrict_vocab=300000, case_insensitive=True, dummy4unknown=False):
         """Compute performance of the model on an analogy test set.
         This is an adaptation of the original gensim analogy implementation of keyedvectors.evaluate_word_analogies().
         Instead of evaluating a single correct answer and returning an accuracy, this method evaluates the similarity of the relation vectors.
@@ -1162,6 +1180,8 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         analogies : str
             Path to file, where lines are 4-tuples of words, split into sections by ": SECTION NAME" lines.
             See `gensim/test/test_data/questions-words.txt` as example.
+        metric : str, optional
+            Whether to use cosine ('cos') or Euclidean ('euc') similarity. Default cosine
         restrict_vocab : int, optional
             Ignore all 4-tuples containing a word not in the first `restrict_vocab` words.
             This may be meaningful if you've sorted the model vocabulary by descending frequency (which is standard
@@ -1222,7 +1242,10 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
 
                 ###### Begin new code ######
                 vectors = [self.word_vec(w) for w in (a,b,c,expected)]
-                score = self._cos_metric(*vectors)
+                if metric == 'euc':
+                    score = self._euc_metric(*vectors)
+                else:
+                    score = self._cos_metric(*vectors)
                 section['scores'].append(score)
                 ###### End new code ######
 

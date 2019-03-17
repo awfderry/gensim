@@ -1166,7 +1166,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         score = np.mean(scores)
         return score
 
-    def evaluate_analogy_space(self, analogies, restrict_vocab=300000, case_insensitive=True, dummy4unknown=False, metric='cos'):
+    def evaluate_analogy_space(self, analogies, restrict_vocab=300000, case_insensitive=True, dummy4unknown=False):
         """Compute performance of the model on an analogy test set.
         This is an adaptation of the original gensim analogy implementation of keyedvectors.evaluate_word_analogies().
         Instead of evaluating a single correct answer and returning an accuracy, this method evaluates the similarity of the relation vectors.
@@ -1242,10 +1242,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
 
                 ###### Begin new code ######
                 vectors = [self.word_vec(w) for w in (a,b,c,expected)]
-                if metric == 'euc':
-                    score = self._euc_metric(*vectors)
-                else:
-                    score = self._cos_metric(*vectors)
+                score = self._euc_metric(*vectors)
                 section['scores'].append(score)
                 ###### End new code ######
 

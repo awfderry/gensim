@@ -1242,7 +1242,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
 
                 ###### Begin new code ######
                 vectors = [self.word_vec(w) for w in (a,b,c,expected)]
-                score = self._euc_metric(*vectors)
+                score = self._cos_metric(*vectors)
                 section['scores'].append(score)
                 ###### End new code ######
 

@@ -1129,7 +1129,7 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         norm_ab = np.linalg.norm(b - a)
         norm_cd = np.linalg.norm(d - c)
         dotprod = np.dot(b - a, d - c)
-        return np.abs(dotprod) / (norm_ab * norm_cd)
+        return dotprod / (norm_ab * norm_cd)
     
     @staticmethod
     def _euc_metric(a, b, c, d):
